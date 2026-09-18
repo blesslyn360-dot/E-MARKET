@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<script>
+  if (localStorage.getItem('theme') === 'dark') document.documentElement.classList.add('dark-mode');
+</script>
+<title>Store</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="css/style.css?v=10" />
+</head>
+<body>
+
+  <div id="toastContainer" class="toast-container" aria-live="polite" aria-atomic="true"></div>
+
+  <header class="site-header">
+    <div class="brand">
+      <img id="companyLogo" class="company-logo hidden" alt="Company logo" />
+      <h1 id="companyName"></h1>
+      <p id="tagline"></p>
+    </div>
+    <nav>
+      <a href="#products">Shop</a>
+      <a href="#about">About</a>
+      <a href="#contact">Contact</a>
+      <a href="/receipt.html">My Receipts</a>
+      <a href="/admin" class="admin-link">Admin Login</a>
+      <button id="cartBtn">🛒 Cart (<span id="cartCount">0</span>)</button>
+      <button id="themeToggle" class="theme-toggle" type="button" aria-label="Switch to dark mode">Dark mode</button>
+    </nav>
+  </header>
+
+  <section id="products">
+    <h2>Available Products</h2>
+    <div id="productGrid" class="product-grid"></div>
+  </section>
+
+  <section id="about">
+    <h2>About Us</h2>
+    <p id="aboutUs"></p>
+  </section>
+
+  <section id="contact">
+    <h2>Contact Us</h2>
+    <ul id="contactList"></ul>
+  </section>
+
+  <div id="cartModal" class="modal hidden">
+    <div class="modal-content">
+      <span class="close" id="closeCart">&times;</span>
+      <h2>Your Cart</h2>
+      <div id="cartItems"></div>
+      <p><strong>Total: ₵<span id="cartTotal">0.00</span></strong></p>
+
+      <h3>Delivery Details</h3>
+      <form id="checkoutForm">
+        <input type="text" id="customerName" placeholder="Full Name" required />
+        <input type="email" id="customerEmail" placeholder="Email" required />
+        <input type="tel" id="customerPhone" placeholder="Phone Number" required />
+        <textarea id="deliveryAddress" placeholder="Delivery Address" required></textarea>
+        <button type="submit">Place Order</button>
+      </form>
+    </div>
+  </div>
+
+  <div id="addToCartModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="addToCartTitle">
+    <div class="confirmation-modal-content">
+      <button type="button" class="confirmation-modal-close" id="cancelAddToCart" aria-label="Close">&times;</button>
+      <img id="addToCartImage" class="confirmation-modal-image" alt="" />
+      <h2 id="addToCartTitle">Add this product to your cart?</h2>
+      <p id="addToCartMessage"></p>
+      <div class="confirmation-modal-actions">
+        <button type="button" id="confirmAddToCart">Yes, add it</button>
+        <button type="button" id="cancelAddToCartAction">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="galleryModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="galleryTitle">
+    <div class="gallery-modal-content">
+      <button type="button" class="confirmation-modal-close" id="closeGallery" aria-label="Close">&times;</button>
+      <h2 id="galleryTitle">Product media</h2>
+      <div id="galleryItems" class="gallery-items"></div>
+    </div>
+  </div>
+
+  <footer>
+    <p>&copy; <span id="year"></span> <span id="companyNameFooter"></span>. All rights reserved.</p>
+    <div class="developer-credit" aria-label="Developer information">
+      <span class="developer-credit-title">Developed by</span>
+      <strong>Blesslyn Akorful</strong>
+      <a href="mailto:blesslyn360@gmail.com">blesslyn360@gmail.com</a>
+      <a href="tel:0598045470">0598045470</a>
+    </div>
+  </footer>
+
+  <script src="https://js.paystack.co/v1/inline.js"></script>
+  <script src="js/main.js?v=2"></script>
+</body>
+</html>

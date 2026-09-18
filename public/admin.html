@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<script>
+  if (localStorage.getItem('theme') === 'dark') document.documentElement.classList.add('dark-mode');
+</script>
+<title>Admin Panel</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/style.css?v=10" />
+</head>
+<body>
+
+  <div id="toastContainer" class="toast-container" aria-live="polite" aria-atomic="true"></div>
+
+  <div id="adminConfirmModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="adminConfirmTitle">
+    <div class="confirmation-modal-content">
+      <button type="button" class="confirmation-modal-close" id="cancelAdminConfirm" aria-label="Close">&times;</button>
+      <h2 id="adminConfirmTitle">Please confirm</h2>
+      <p id="adminConfirmMessage"></p>
+      <div class="confirmation-modal-actions">
+        <button type="button" id="confirmAdminAction">Yes, delete it</button>
+        <button type="button" id="cancelAdminConfirmAction">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="loginView" class="login-wrapper">
+    <form id="loginForm" class="login-form">
+      <h2>Admin Login</h2>
+      <input type="text" id="loginUsername" placeholder="Username" required />
+      <input type="password" id="loginPassword" placeholder="Password" required />
+      <button type="submit">Login</button>
+      <p id="loginError" class="error"></p>
+      <a href="/">&larr; Back to site</a>
+    </form>
+  </div>
+
+  <div id="dashboardView" class="hidden">
+    <header class="admin-header">
+      <div class="admin-brand">
+        <img id="adminCompanyLogo" class="company-logo hidden" alt="Company logo" />
+        <h1>Admin Dashboard</h1>
+      </div>
+      <div class="admin-header-actions">
+        <a href="/" class="admin-shop-link">Back to Shop</a>
+        <button id="themeToggle" class="theme-toggle" type="button" aria-label="Switch to dark mode">Dark mode</button>
+        <button id="logoutBtn">Logout</button>
+      </div>
+    </header>
+
+    <nav class="admin-tabs">
+      <button class="tab-btn active" data-tab="productsTab">Products</button>
+      <button class="tab-btn" data-tab="ordersTab">Orders</button>
+      <button class="tab-btn" data-tab="companyTab">Company Info</button>
+    </nav>
+
+    <section id="productsTab" class="tab-panel">
+      <h2>Add New Product</h2>
+      <form id="productForm" class="product-form">
+        <label class="form-field">Product name<input type="text" id="pName" placeholder="Enter product name" required /></label>
+        <label class="form-field">Category<input type="text" id="pCategory" placeholder="e.g. Clothing, Beauty, Food" /></label>
+        <label class="form-field">Price<input type="number" id="pPrice" placeholder="0.00" step="0.01" min="0" required /></label>
+        <label class="form-field">Quantity available<input type="number" id="pQuantity" placeholder="0" min="0" required /></label>
+        <label class="form-field form-field-wide">Product description<textarea id="pDescription" placeholder="Describe the product, its features, and what customers should know..."></textarea></label>
+        <div class="upload-field form-field-wide">
+          <label class="file-field-label" for="pImage">Product Images (optional, max 20)</label>
+          <input type="file" id="pImage" accept="image/*" multiple />
+        </div>
+        <div id="imageCaptions" class="image-captions"></div>
+        <div class="upload-field form-field-wide">
+          <label class="file-field-label" for="pVideo">Product Videos (optional, max 2)</label>
+          <input type="file" id="pVideo" accept="video/mp4,video/webm,video/quicktime" multiple />
+        </div>
+        <div id="videoCaptions" class="image-captions"></div>
+        <div class="product-form-actions">
+          <button type="submit">Add Product</button>
+          <button type="button" id="cancelAddProduct" class="cancel-btn">Cancel</button>
+        </div>
+      </form>
+
+      <div id="editProductPanel" class="hidden">
+        <h2>Edit Product</h2>
+        <form id="editProductForm">
+          <input type="text" id="editName" placeholder="Product name" required />
+          <label class="file-field-label" for="editDescription">Product description</label>
+          <textarea id="editDescription" placeholder="Update the product description..."></textarea>
+          <input type="number" id="editPrice" placeholder="Price" step="0.01" required />
+          <input type="number" id="editQuantity" placeholder="Quantity available" required />
+          <input type="text" id="editCategory" placeholder="Category" />
+          <p class="media-description-help">Update each image description separately below.</p>
+          <div id="editImages" class="image-captions edit-media-list"></div>
+          <label class="file-field-label" for="editImageFiles">Add Images (20 maximum per product)</label>
+          <input type="file" id="editImageFiles" accept="image/*" multiple />
+          <div id="editImageCaptions" class="image-captions"></div>
+          <div id="editVideos" class="image-captions edit-media-list"></div>
+          <label class="file-field-label" for="editVideoFiles">Add Videos (optional, max 2 total)</label>
+          <input type="file" id="editVideoFiles" accept="video/mp4,video/webm,video/quicktime" multiple />
+          <div id="editVideoCaptions" class="image-captions"></div>
+          <div class="edit-form-actions">
+            <button type="submit">Save Changes</button>
+            <button type="button" id="cancelEditProduct" class="cancel-btn">Cancel</button>
+          </div>
+        </form>
+      </div>
+
+      <h2>Current Products</h2>
+      <div id="adminProductList" class="admin-list"></div>
+    </section>
+
+    <section id="ordersTab" class="tab-panel hidden">
+      <h2>Customer Orders</h2>
+      <div id="ordersList" class="admin-list"></div>
+    </section>
+
+    <section id="companyTab" class="tab-panel hidden">
+      <h2>Company Information</h2>
+      <form id="companyForm">
+        <input type="text" id="cName" placeholder="Company name" />
+        <div class="company-logo-upload">
+          <img id="companyLogoPreview" class="company-logo-preview hidden" alt="Current company logo" />
+          <label class="file-field-label" for="companyLogo">Company Logo</label>
+          <input type="file" id="companyLogo" accept="image/*" />
+        </div>
+        <input type="text" id="cTagline" placeholder="Tagline" />
+        <textarea id="cAbout" placeholder="About us"></textarea>
+        <input type="email" id="cEmail" placeholder="Contact email" />
+        <input type="tel" id="cPhone" placeholder="Contact phone" />
+        <input type="text" id="cAddress" placeholder="Address" />
+        <input type="text" id="cFacebook" placeholder="Facebook link" />
+        <input type="text" id="cInstagram" placeholder="Instagram link" />
+        <input type="text" id="cWhatsapp" placeholder="WhatsApp link/number" />
+        <input type="text" id="cTiktok" placeholder="TikTok link" />
+        <input type="text" id="cSnapchat" placeholder="Snapchat link" />
+        <button type="submit">Save Company Info</button>
+      </form>
+      <p id="companySaved" class="success hidden">Saved!</p>
+    </section>
+  </div>
+
+  <footer class="admin-footer">
+    <div class="developer-credit" aria-label="Developer information">
+      <span class="developer-credit-title">Developed by</span>
+      <strong>Blesslyn Akorful</strong>
+      <a href="mailto:blesslyn360@gmail.com">blesslyn360@gmail.com</a>
+      <a href="tel:0598045470">0598045470</a>
+    </div>
+  </footer>
+
+  <script src="js/admin.js?v=6"></script>
+</body>
+</html>
