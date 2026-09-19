@@ -5,12 +5,16 @@ async function verifyPaystackTransaction(reference) {
       return { success: false, message: 'Payment verification is not configured on the server.' };
     }
 
-    const response = await fetch(`https://api.paystack.co/transaction/verify/${reference}`, {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10000);
+    const response = await fetch(`https://api.paystack.co/transaction/verify/${encodeURIComponent(reference)}`, {
       method: 'GET',
       headers: {
         Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}`,
       },
+      signal: controller.signal,
     });
+    clearTimeout(timeout);
 
     const data = await response.json();
 
@@ -31,6 +35,7 @@ async function verifyPaystackTransaction(reference) {
       email: transaction.customer.email,
     };
   } catch (err) {
+    if (err.name === 'AbortError') return { success: false, message: 'Payment verification timed out. Please try again.' };
     return { success: false, message: err.message };
   }
 }

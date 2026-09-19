@@ -1,12 +1,24 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const rateLimit = require('express-rate-limit');
 const Admin = require('../models/Admin');
 
 const router = express.Router();
 
+// Block brute-force password guessing: max 5 attempts per 15 minutes per IP.
+// Successful logins don't count against the limit.
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  skipSuccessfulRequests: true,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { message: 'Too many login attempts. Please try again in 15 minutes.' },
+});
+
 // POST /api/auth/login  -> admin logs in with the username/password they set
-router.post('/login', async (req, res) => {
+router.post('/login', loginLimiter, async (req, res) => {
   try {
     const { username, password } = req.body;
 
@@ -32,7 +44,8 @@ router.post('/login', async (req, res) => {
 
     res.json({ token, username: admin.username });
   } catch (err) {
-    res.status(500).json({ message: 'Server error during login.', error: err.message });
+    console.error('Server error during login.', err);
+    res.status(500).json({ message: 'Server error during login.' });
   }
 });
 

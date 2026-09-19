@@ -10,7 +10,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-<link rel="stylesheet" href="css/style.css?v=10" />
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" />
+<link rel="stylesheet" href="css/style.css?v=22" />
 </head>
 <body>
 
@@ -87,6 +88,15 @@
     </div>
   </div>
 
+  <div id="imageViewerModal" class="image-viewer-modal hidden" role="dialog" aria-modal="true" aria-labelledby="imageViewerCaption">
+    <button type="button" class="image-viewer-close" id="closeImageViewer" aria-label="Close enlarged image">&times;</button>
+    <figure class="image-viewer-content">
+      <img id="imageViewerImage" alt="" />
+      <video id="imageViewerVideo" controls playsinline></video>
+      <figcaption id="imageViewerCaption"></figcaption>
+    </figure>
+  </div>
+
   <footer>
     <p>&copy; <span id="year"></span> <span id="companyNameFooter"></span>. All rights reserved.</p>
     <div class="developer-credit" aria-label="Developer information">
@@ -98,6 +108,6 @@
   </footer>
 
   <script src="https://js.paystack.co/v1/inline.js"></script>
-  <script src="js/main.js?v=2"></script>
+  <script src="js/main.js?v=8"></script>
 </body>
 </html>

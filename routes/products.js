@@ -1,8 +1,8 @@
 const express = require('express');
 const multer = require('multer');
-const path = require('path');
-const fs = require('fs');
-const crypto = require('crypto');
+const { CloudinaryStorage } = require('multer-storage-cloudinary');
+const cloudinary = require('../config/cloudinary');
+const { deleteCloudinaryAsset } = require('../utils/cloudinary');
 const Product = require('../models/Product');
 const protectAdmin = require('../middleware/auth');
 
@@ -10,12 +10,11 @@ const router = express.Router();
 const MAX_PRODUCT_IMAGES = 20;
 
 // --- Product media upload setup ---
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, path.join(__dirname, '..', 'uploads')),
-  filename: (req, file, cb) => {
-    const extension = path.extname(file.originalname).toLowerCase();
-    const uniqueName = `${crypto.randomUUID()}${extension}`;
-    cb(null, uniqueName);
+const storage = new CloudinaryStorage({
+  cloudinary,
+  params: {
+    folder: 'marketing-app/products',
+    resource_type: 'auto',
   },
 });
 const upload = multer({
@@ -54,14 +53,14 @@ function parseCaptions(value) {
 
 function buildImages(files, captions) {
   return (files || []).map((file, index) => ({
-    url: `/uploads/${file.filename}`,
+    url: file.path,
     caption: captions[index] || '',
   }));
 }
 
 function buildVideos(files, captions) {
   return (files || []).map((file, index) => ({
-    url: `/uploads/${file.filename}`,
+    url: file.path,
     caption: captions[index] || '',
   }));
 }
@@ -89,25 +88,15 @@ function filterExistingMedia(urls, existingMedia) {
   return urls.filter((url) => existingUrls.has(url));
 }
 
-function removeUploadedFiles(files) {
-  (files || []).forEach((file) => removeUploadedFile(`/uploads/${file.filename}`));
+async function removeUploadedFiles(files) {
+  await Promise.all((files || []).map((file) => deleteCloudinaryAsset(file)));
 }
 
-function removeUploadedFile(mediaUrl) {
-  if (!mediaUrl || !mediaUrl.startsWith('/uploads/')) return;
-  const filePath = path.join(__dirname, '..', 'uploads', path.basename(mediaUrl));
-  try {
-    fs.unlinkSync(filePath);
-  } catch (err) {
-    // A missing file should not prevent the product update from succeeding.
-  }
-}
-
-function removeDeletedMedia(previousMedia, nextMedia) {
+async function removeDeletedMedia(previousMedia, nextMedia) {
   const keptUrls = new Set(nextMedia.map((media) => media.url));
-  previousMedia.forEach((media) => {
-    if (!keptUrls.has(media.url)) removeUploadedFile(media.url);
-  });
+  await Promise.all(previousMedia
+    .filter((media) => !keptUrls.has(media.url))
+    .map((media) => deleteCloudinaryAsset(media.url)));
 }
 
 // GET /api/products -> anyone (customers) can view all products
@@ -116,7 +105,8 @@ router.get('/', async (req, res) => {
     const products = await Product.find().sort({ createdAt: -1 });
     res.json(products);
   } catch (err) {
-    res.status(500).json({ message: 'Failed to load products.', error: err.message });
+    console.error('Failed to load products.', err);
+    res.status(500).json({ message: 'Failed to load products.' });
   }
 });
 
@@ -140,9 +130,9 @@ router.post('/', protectAdmin, uploadProductMedia, async (req, res) => {
 
     res.status(201).json(product);
   } catch (err) {
-    removeUploadedFiles(req.files?.images);
-    removeUploadedFiles(req.files?.videos);
-    res.status(500).json({ message: 'Failed to add product.', error: err.message });
+    await removeUploadedFiles([...req.files?.images || [], ...req.files?.videos || []]);
+    console.error('Failed to add product.', err);
+    res.status(500).json({ message: 'Failed to add product.' });
   }
 });
 
@@ -160,8 +150,7 @@ router.put('/:id', protectAdmin, uploadProductMedia, async (req, res) => {
     if (keptImages !== null) {
       const validKeptImages = filterExistingMedia(keptImages, existingProduct.images || []);
       if (validKeptImages.length + (req.files?.images?.length || 0) > MAX_PRODUCT_IMAGES) {
-        removeUploadedFiles(req.files?.images);
-        removeUploadedFiles(req.files?.videos);
+        await removeUploadedFiles([...req.files?.images || [], ...req.files?.videos || []]);
         return res.status(400).json({ message: `A product can have a maximum of ${MAX_PRODUCT_IMAGES} images.` });
       }
       updateData.images = reconcileMedia(
@@ -179,8 +168,7 @@ router.put('/:id', protectAdmin, uploadProductMedia, async (req, res) => {
     if (keptVideos !== null) {
       const validKeptVideos = filterExistingMedia(keptVideos, existingProduct.videos || []);
       if (validKeptVideos.length + (req.files?.videos?.length || 0) > 2) {
-        removeUploadedFiles(req.files?.images);
-        removeUploadedFiles(req.files?.videos);
+        await removeUploadedFiles([...req.files?.images || [], ...req.files?.videos || []]);
         return res.status(400).json({ message: 'A product can have a maximum of 2 videos.' });
       }
       updateData.videos = reconcileMedia(
@@ -195,13 +183,13 @@ router.put('/:id', protectAdmin, uploadProductMedia, async (req, res) => {
 
     const product = await Product.findByIdAndUpdate(req.params.id, updateData, { new: true, runValidators: true });
     if (!product) return res.status(404).json({ message: 'Product not found.' });
-    if (keptImages !== null) removeDeletedMedia(existingProduct.images || [], product.images || []);
-    if (keptVideos !== null) removeDeletedMedia(existingProduct.videos || [], product.videos || []);
+    if (keptImages !== null) await removeDeletedMedia(existingProduct.images || [], product.images || []);
+    if (keptVideos !== null) await removeDeletedMedia(existingProduct.videos || [], product.videos || []);
     res.json(product);
   } catch (err) {
-    removeUploadedFiles(req.files?.images);
-    removeUploadedFiles(req.files?.videos);
-    res.status(500).json({ message: 'Failed to update product.', error: err.message });
+    await removeUploadedFiles([...req.files?.images || [], ...req.files?.videos || []]);
+    console.error('Failed to update product.', err);
+    res.status(500).json({ message: 'Failed to update product.' });
   }
 });
 
@@ -210,11 +198,12 @@ router.delete('/:id', protectAdmin, async (req, res) => {
   try {
     const product = await Product.findByIdAndDelete(req.params.id);
     if (!product) return res.status(404).json({ message: 'Product not found.' });
-    removeDeletedMedia(product.images || [], []);
-    removeDeletedMedia(product.videos || [], []);
+    await removeDeletedMedia(product.images || [], []);
+    await removeDeletedMedia(product.videos || [], []);
     res.json({ message: 'Product deleted.' });
   } catch (err) {
-    res.status(500).json({ message: 'Failed to delete product.', error: err.message });
+    console.error('Failed to delete product.', err);
+    res.status(500).json({ message: 'Failed to delete product.' });
   }
 });
 

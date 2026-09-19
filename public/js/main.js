@@ -19,7 +19,10 @@ function escapeHtml(value) {
   }[character]));
 }
 
-loadCompanyInfo();
+loadCompanyInfo().catch((err) => {
+  console.error('Company information failed to load:', err);
+  showToast('Unable to load company information. Please refresh the page.', 'error');
+});
 
 function showToast(message, type = 'info') {
   const container = document.getElementById('toastContainer');
@@ -71,10 +74,41 @@ async function loadCompanyInfo() {
 
   const contactList = document.getElementById('contactList');
   contactList.innerHTML = '';
-  if (info.email) contactList.innerHTML += `<li>Email: ${info.email}</li>`;
-  if (info.phone) contactList.innerHTML += `<li>Phone: ${info.phone}</li>`;
-  if (info.address) contactList.innerHTML += `<li>Address: ${info.address}</li>`;
-  if (info.whatsapp) contactList.innerHTML += `<li>WhatsApp: ${info.whatsapp}</li>`;
+
+  const addContactButton = (label, href, external = false, iconClass = '') => {
+    if (!href) return;
+    const item = document.createElement('li');
+    const link = document.createElement('a');
+    link.className = 'contact-button';
+    link.href = href;
+    if (iconClass) {
+      const icon = document.createElement('i');
+      icon.className = iconClass;
+      icon.setAttribute('aria-hidden', 'true');
+      link.appendChild(icon);
+    }
+    link.appendChild(document.createTextNode(label));
+    if (external) {
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+    }
+    item.appendChild(link);
+    contactList.appendChild(item);
+  };
+
+  const email = info.email?.trim();
+  const phone = info.phone?.trim();
+  const whatsapp = info.whatsapp?.trim();
+  const address = info.address?.trim();
+  if (email) addContactButton('Email', `mailto:${email}`, false, 'fa-solid fa-envelope');
+  if (phone) addContactButton('Phone', `tel:${phone.replace(/[^\d+]/g, '')}`, false, 'fa-solid fa-phone');
+  if (whatsapp) {
+    const pastedUrl = whatsapp.match(/https?:\/\/\S+/i)?.[0];
+    const whatsappUrl = pastedUrl || `https://wa.me/${whatsapp.replace(/\D/g, '')}`;
+    addContactButton('WhatsApp', whatsappUrl, true, 'fa-brands fa-whatsapp');
+  }
+  if (address) addContactButton('Address', `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`, true, 'fa-solid fa-location-dot');
+
   [
     ['Facebook', info.facebook],
     ['Instagram', info.instagram],
@@ -91,8 +125,19 @@ async function loadCompanyInfo() {
     }
     const item = document.createElement('li');
     const link = document.createElement('a');
+    link.className = 'contact-button';
     link.href = linkUrl;
-    link.textContent = `${label}: ${url.trim()}`;
+    const iconMap = {
+      Facebook: 'fa-brands fa-facebook',
+      Instagram: 'fa-brands fa-instagram',
+      TikTok: 'fa-brands fa-tiktok',
+      Snapchat: 'fa-brands fa-snapchat',
+    };
+    const icon = document.createElement('i');
+    icon.className = iconMap[label];
+    icon.setAttribute('aria-hidden', 'true');
+    link.appendChild(icon);
+    link.appendChild(document.createTextNode(label));
     link.target = '_blank';
     link.rel = 'noopener noreferrer';
     item.appendChild(link);
@@ -130,7 +175,7 @@ async function loadProducts() {
             <source src="${escapeHtml(videos[0].url)}" type="${getVideoMimeType(videos[0].url)}" />
           </video>
           <button type="button" class="video-mute-toggle" onclick="toggleCardVideoSound(this)" aria-label="Unmute product video">Unmute</button>
-        ` : `<img src="${escapeHtml(firstImage.url)}" alt="${escapeHtml(p.name)}" />`}
+        ` : `<button type="button" class="product-image-button" aria-label="View ${escapeHtml(p.name)} image"><img src="${escapeHtml(firstImage.url)}" alt="${escapeHtml(p.name)}" /></button>`}
       </div>
       <h3>${escapeHtml(p.name)}</h3>
       <span class="product-category">${escapeHtml(p.category || 'General')}</span>
@@ -150,6 +195,20 @@ async function loadProducts() {
       const button = event.currentTarget;
       addToCart(button.dataset.productId, button.dataset.productName, Number(button.dataset.productPrice), Number(button.dataset.productQuantity));
     });
+
+    const productVideo = card.querySelector('.product-card-video');
+    if (productVideo) {
+      productVideo.addEventListener('click', () => {
+        openMediaViewer(videos[0].url, 'video', `${p.name} product video`, videos[0].caption);
+      });
+    }
+
+    const productImageButton = card.querySelector('.product-image-button');
+    if (productImageButton) {
+      productImageButton.addEventListener('click', () => {
+        openMediaViewer(firstImage.url, 'image', p.name, firstImage.caption);
+      });
+    }
 
     const description = p.description || '';
     const descriptionText = card.querySelector('.description-text');
@@ -316,7 +375,7 @@ function openGallery(productId) {
   galleryItems.innerHTML = gallery.map((media, index) => {
     if (media.type === 'video') {
       return `
-        <div class="gallery-item gallery-video" data-media-type="video">
+        <div class="gallery-item gallery-video" role="button" tabindex="0" data-media-type="video" data-video-url="${escapeHtml(media.url)}" data-video-caption="${escapeHtml(media.caption || '')}">
           <video controls preload="metadata">
             <source src="${escapeHtml(media.url)}" type="${getVideoMimeType(media.url)}" />
             Your browser does not support this video format.
@@ -338,13 +397,18 @@ function openGallery(productId) {
 
 document.getElementById('galleryItems').addEventListener('click', (e) => {
   const item = e.target.closest('.gallery-item');
-  if (!item || item.dataset.mediaType !== 'image') return;
+  if (!item) return;
+  if (item.dataset.mediaType === 'video') {
+    if (e.target.closest('video')) e.preventDefault();
+    openMediaViewer(item.dataset.videoUrl, 'video', 'Product video', item.dataset.videoCaption);
+    return;
+  }
   const productId = item.dataset.productId;
   const image = productGallery[productId][Number(item.dataset.imageIndex)];
   selectedImages[productId] = { url: image.url || '', caption: image.caption || '', type: 'image' };
   document.querySelectorAll('.gallery-item').forEach((galleryItem) => galleryItem.classList.remove('selected'));
   item.classList.add('selected');
-  document.getElementById('galleryModal').classList.add('hidden');
+  openMediaViewer(image.url, 'image', image.caption || 'Product photo', image.caption);
 });
 
 function closeGallery() {
@@ -354,6 +418,44 @@ function closeGallery() {
 document.getElementById('closeGallery').addEventListener('click', closeGallery);
 document.getElementById('galleryModal').addEventListener('click', (e) => {
   if (e.target.id === 'galleryModal') closeGallery();
+});
+
+function openMediaViewer(url, type, alt, caption = '') {
+  const image = document.getElementById('imageViewerImage');
+  const video = document.getElementById('imageViewerVideo');
+  image.classList.toggle('hidden', type !== 'image');
+  video.classList.toggle('hidden', type !== 'video');
+  if (type === 'video') {
+    video.src = url;
+    video.setAttribute('aria-label', alt);
+    video.play().catch(() => {});
+  } else {
+    image.src = url;
+    image.alt = alt;
+  }
+  document.getElementById('imageViewerCaption').textContent = caption || alt;
+  document.getElementById('imageViewerModal').classList.remove('hidden');
+}
+
+function closeImageViewer() {
+  document.getElementById('imageViewerModal').classList.add('hidden');
+  document.getElementById('imageViewerImage').src = '';
+  const video = document.getElementById('imageViewerVideo');
+  video.pause();
+  video.removeAttribute('src');
+  video.load();
+}
+
+document.getElementById('closeImageViewer').addEventListener('click', closeImageViewer);
+document.getElementById('imageViewerModal').addEventListener('click', (e) => {
+  if (e.target.id === 'imageViewerModal') closeImageViewer();
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    closeImageViewer();
+    closeGallery();
+    closeAddToCartModal();
+  }
 });
 
 async function finalizeOrder(orderData) {
@@ -403,7 +505,10 @@ async function finalizeOrder(orderData) {
     updateCartUI();
     document.getElementById('checkoutForm').reset();
     document.getElementById('cartModal').classList.add('hidden');
-    loadProducts();
+    loadProducts().catch((err) => {
+      console.error('Products refresh failed:', err);
+      showToast('Order placed, but products could not be refreshed.', 'error');
+    });
     setTimeout(() => {
       window.location.href = '/receipt.html';
     }, 1200);
@@ -475,4 +580,7 @@ document.getElementById('checkoutForm').addEventListener('submit', async (e) => 
   }
 });
 
-loadProducts();
+loadProducts().catch((err) => {
+  console.error('Products failed to load:', err);
+  showToast('Unable to load products. Please refresh the page.', 'error');
+});

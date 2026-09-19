@@ -1,11 +1,22 @@
 const express = require('express');
 const mongoose = require('mongoose');
+const rateLimit = require('express-rate-limit');
 const Order = require('../models/Order');
 const Product = require('../models/Product');
 const protectAdmin = require('../middleware/auth');
 const { verifyPaystackTransaction } = require('../utils/paystack');
 
 const router = express.Router();
+
+// This route is public (no login) and calls out to Paystack's API on every
+// request, so limit how often one visitor can hit it to prevent abuse/spam.
+const orderLimiter = rateLimit({
+  windowMs: 10 * 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { message: 'Too many order attempts. Please wait a few minutes and try again.' },
+});
 
 function resolveSelectedImage(product, selectedImage) {
   const productImages = product.images?.length
@@ -23,12 +34,15 @@ function resolveSelectedImage(product, selectedImage) {
 }
 
 // POST /api/orders -> a customer submits a purchase (no login needed to buy)
-router.post('/', async (req, res) => {
+router.post('/', orderLimiter, async (req, res) => {
   try {
     const { customerName, customerEmail, customerPhone, deliveryAddress, items, paystackReference } = req.body;
 
     if (!paystackReference) {
       return res.status(400).json({ message: 'A Paystack payment reference is required.' });
+    }
+    if (await Order.exists({ paymentReference: paystackReference })) {
+      return res.status(409).json({ message: 'This payment has already been used for an order.' });
     }
 
     if (!Array.isArray(items) || items.length === 0) {
@@ -125,8 +139,12 @@ router.post('/', async (req, res) => {
 
     res.status(201).json({ message: 'Order placed successfully!', order });
   } catch (err) {
+    if (err.code === 11000 && err.keyPattern?.paymentReference) {
+      return res.status(409).json({ message: 'This payment has already been used for an order.' });
+    }
     console.error('Failed to create order:', err);
-    res.status(500).json({ message: 'Failed to place order.', error: err.message });
+    console.error('Failed to place order.', err);
+    res.status(500).json({ message: 'Failed to place order.' });
   }
 });
 
@@ -136,7 +154,8 @@ router.get('/', protectAdmin, async (req, res) => {
     const orders = await Order.find().sort({ createdAt: -1 });
     res.json(orders);
   } catch (err) {
-    res.status(500).json({ message: 'Failed to load orders.', error: err.message });
+    console.error('Failed to load orders.', err);
+    res.status(500).json({ message: 'Failed to load orders.' });
   }
 });
 
@@ -170,7 +189,8 @@ router.delete('/:id', protectAdmin, async (req, res) => {
     if (err.name === 'CastError') {
       return res.status(404).json({ message: 'Order not found.' });
     }
-    res.status(500).json({ message: 'Failed to delete order.', error: err.message });
+    console.error('Failed to delete order.', err);
+    res.status(500).json({ message: 'Failed to delete order.' });
   }
 });
 
@@ -178,11 +198,15 @@ router.delete('/:id', protectAdmin, async (req, res) => {
 router.put('/:id', protectAdmin, async (req, res) => {
   try {
     const { status } = req.body;
+    if (!['Pending', 'Processing', 'Completed', 'Cancelled'].includes(status)) {
+      return res.status(400).json({ message: 'Invalid order status.' });
+    }
     const order = await Order.findByIdAndUpdate(req.params.id, { status }, { new: true, runValidators: true });
     if (!order) return res.status(404).json({ message: 'Order not found.' });
     res.json(order);
   } catch (err) {
-    res.status(500).json({ message: 'Failed to update order.', error: err.message });
+    console.error('Failed to update order.', err);
+    res.status(500).json({ message: 'Failed to update order.' });
   }
 });
 

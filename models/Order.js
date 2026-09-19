@@ -27,7 +27,7 @@ const orderSchema = new mongoose.Schema(
       enum: ['Pending', 'Processing', 'Completed', 'Cancelled'],
       default: 'Pending',
     },
-    paymentReference: { type: String, required: true },
+    paymentReference: { type: String, required: true, unique: true, index: true },
     paymentStatus: { type: String, enum: ['Paid', 'Refunded'], default: 'Paid' },
   },
   { timestamps: true }
